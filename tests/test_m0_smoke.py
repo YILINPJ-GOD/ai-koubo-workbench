@@ -113,3 +113,13 @@ def test_sources_seeded_with_qwen():
     init_db()
     keys = {r["key"] for r in query("SELECT key FROM sources")}
     assert "qwen" in keys
+
+
+def test_startup_bat_has_watchdog():
+    """启动脚本带看护循环：意外退出自动重启（修：服务静默退出后"打不开"）。"""
+    from pathlib import Path
+
+    bat = Path(__file__).resolve().parent.parent / "启动.bat"
+    text = bat.read_text(encoding="utf-8")
+    assert ":loop" in text and "goto loop" in text  # 看护循环
+    assert "uvicorn" in text  # 服务启动命令
