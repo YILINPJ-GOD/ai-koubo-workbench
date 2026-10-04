@@ -104,12 +104,63 @@ def todo_items(limit: int = 12) -> list[dict]:
     )
 
 
-def mark_all_read() -> int:
+def _build_where(
+    category: str = "",
+    source_type: str = "",
+    unread_only: bool = False,
+    starred_only: bool = False,
+    q: str = "",
+    day: str = "",
+    region: str = "",
+) -> tuple[str, list]:
+    """与 list_items 完全一致的过滤条件构造（供标记类操作复用）。"""
+    where, params = ["1=1"], []
+    if category:
+        where.append("i.category=?")
+        params.append(category)
+    if source_type:
+        where.append("i.source_type=?")
+        params.append(source_type)
+    if unread_only:
+        where.append("i.is_read=0")
+    if starred_only:
+        where.append("i.is_starred=1")
+    if q:
+        where.append("(i.title LIKE ? OR i.summary LIKE ?)")
+        params.extend([f"%{q}%", f"%{q}%"])
+    if day:
+        where.append("i.day=?")
+        params.append(day)
+    if region:
+        where.append("COALESCE(NULLIF(i.region,''), s.region)=?")
+        params.append(region)
+    return " AND ".join(where), params
+
+
+def mark_all_read(
+    category: str = "",
+    source_type: str = "",
+    q: str = "",
+    day: str = "",
+    region: str = "",
+) -> int:
+    """按当前筛选范围标记已读（而非全库）。"""
     from ..db import connect
 
+    where, params = _build_where(
+        category=category, source_type=source_type, unread_only=True,
+        q=q, day=day, region=region,
+    )
     conn = connect()
     try:
-        cur = conn.execute("UPDATE items SET is_read=1 WHERE is_read=0")
+        cur = conn.execute(
+            f"""UPDATE items SET is_read=1 WHERE is_read=0 AND id IN (
+                SELECT i.id FROM items i
+                LEFT JOIN hotspots h ON i.event_id = h.id
+                LEFT JOIN sources s ON s.key = i.source_key
+                WHERE {where})""",
+            params,
+        )
         conn.commit()
         return cur.rowcount
     finally:

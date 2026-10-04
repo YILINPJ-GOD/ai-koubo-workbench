@@ -560,3 +560,29 @@ def test_item_region_from_content(fresh_db, monkeypatch):
         assert body["total"] == 1
         body = c.get("/api/feed", params={"region": "国内"}).json()
         assert body["total"] == 0
+
+
+def test_read_all_scoped_to_filters(client):
+    """「全部标为已读」只作用于当前筛选范围（修：之前会全库标掉）。"""
+    from app.db import execute, query_one
+
+    ids = _seed_items()  # 3 条国内 qbitai，category=大模型
+    from app.db import query as _q
+    print("DBG after seed:", [(r["id"], r["is_read"]) for r in _q("SELECT id, is_read FROM items")])
+    execute(
+        "INSERT INTO items(source_key, source_type, title, url, summary, category, fetched_at, day, region) "
+        "VALUES ('hackernews','overseas','海外未读','http://hn/9','sum','AI产品','x','2026-10-03','海外')"
+    )
+    print("DBG after insert:", [(r["id"], r["is_read"]) for r in _q("SELECT id, is_read FROM items")])
+
+    # 在 category=大模型 筛选下点全部已读
+    r = client.post("/api/feed/read-all", params={"category": "大模型"}).json()
+    assert r["marked"] == 2  # 种子第1条本就是已读，海外条不在该筛选
+
+    # 海外那条不受影响
+    assert query_one("SELECT is_read FROM items WHERE title='海外未读'")["is_read"] == 0
+
+    # 海外范围下再点
+    r = client.post("/api/feed/read-all", params={"region": "海外"}).json()
+    assert r["marked"] == 1
+    assert query_one("SELECT is_read FROM items WHERE title='海外未读'")["is_read"] == 1

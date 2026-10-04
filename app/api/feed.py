@@ -93,8 +93,14 @@ def promote_to_hotspot(item_id: int):
 
 
 @router.post("/feed/read-all")
-def read_all():
-    return {"marked": feed.mark_all_read()}
+def read_all(
+    category: str = "",
+    source_type: str = "",
+    q: str = "",
+    day: str = "",
+    region: str = "",
+):
+    return {"marked": feed.mark_all_read(category=category, source_type=source_type, q=q, day=day, region=region)}
 
 
 @router.post("/refresh")

@@ -247,9 +247,9 @@ export default function Feed() {
   const archiveQuery = useQuery({ queryKey: ['archive'], queryFn: () => api.get('/api/feed/archive') })
 
   const readAll = useMutation({
-    mutationFn: () => api.post('/api/feed/read-all'),
+    mutationFn: () => api.post('/api/feed/read-all?' + new URLSearchParams({ category, source_type: sourceType, q, day, region })),
     onSuccess: (r) => {
-      toast(`已把 ${r.marked} 条标为已读`, 'success')
+      toast(r.marked > 0 ? `已把当前范围内 ${r.marked} 条标为已读` : '当前范围内没有未读', 'success')
       useQueryClient().invalidateQueries()
     },
   })
