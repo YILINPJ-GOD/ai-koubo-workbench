@@ -73,7 +73,7 @@ export default function Hotspots() {
           ['shot', '已拍'],
           ['expired', '已过时'],
         ].map(([v, label]) => (
-          <button key={v} className={`chip ${status === v ? 'chip-on' : 'chip-off'}`} onClick={() => setStatus(v)}>
+          <button key={v} className={`chip ${status === v ? 'chip-on' : 'chip-off'}`} onClick={() => setTab(v)}>
             {label}
           </button>
         ))}
