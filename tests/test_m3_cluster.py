@@ -212,7 +212,7 @@ def _seed_hotspot(status="pending", **kw):
         "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (
             kw.get("title", "测试热点"), "值得讲", json.dumps(["角度A"], ensure_ascii=False),
-            "30s", 88, TODAY, "", "2026-10-03T08:00:00", "2026-10-03T08:00:00",
+            "30s", 88, TODAY, "", TODAY + "T08:00:00", TODAY + "T08:00:00",
             status, kw.get("must", 1),
         ),
     )

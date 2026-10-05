@@ -2,6 +2,8 @@
 import json
 import time
 
+TODAY = time.strftime('%Y-%m-%d')
+
 import pytest
 from fastapi.testclient import TestClient
 
