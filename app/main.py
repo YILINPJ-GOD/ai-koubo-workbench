@@ -36,7 +36,7 @@ app = FastAPI(title="AI口播工作台", lifespan=lifespan)
 # 防 DNS rebinding：只接受本机 Host 头（审查F2）
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["127.0.0.1:8787", "localhost:8787", "testserver"],
+    allowed_hosts=["127.0.0.1", "localhost", "testserver"],  # starlette 匹配的是不含端口的主机名
 )
 
 app.include_router(system.router, prefix="/api")

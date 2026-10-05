@@ -123,3 +123,22 @@ def test_startup_bat_has_watchdog():
     text = bat.read_text(encoding="utf-8")
     assert ":loop" in text and "goto loop" in text  # 看护循环
     assert "uvicorn" in text  # 服务启动命令
+
+
+def test_host_header_validation():
+    """安全回归：恶意 Host 被拒（防 DNS rebinding），本机 Host 放行（审查F2）。"""
+    from pathlib import Path
+
+    main_src = (Path(__file__).resolve().parent.parent / "app" / "main.py").read_text(encoding="utf-8")
+    assert "TrustedHostMiddleware" in main_src
+
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app) as c:
+        # TestClient 默认 host=testserver（在白名单）
+        assert c.get("/api/health").status_code == 200
+        # 恶意 host 被拒
+        r = c.get("/api/health", headers={"Host": "evil.example"})
+        assert r.status_code == 400
