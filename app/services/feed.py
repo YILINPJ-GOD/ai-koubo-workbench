@@ -19,15 +19,15 @@ def list_items(
     where, params = ["1=1"], []
 
     if category:
-        where.append("category=?")
+        where.append("i.category=?")
         params.append(category)
     if source_type:
-        where.append("source_type=?")
+        where.append("i.source_type=?")
         params.append(source_type)
     if unread_only:
-        where.append("is_read=0")
+        where.append("i.is_read=0")
     if starred_only:
-        where.append("is_starred=1")
+        where.append("i.is_starred=1")
     if q:
         where.append("(i.title LIKE ? OR i.summary LIKE ?)")
         params.extend([f"%{q}%", f"%{q}%"])

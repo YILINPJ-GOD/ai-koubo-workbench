@@ -586,3 +586,19 @@ def test_read_all_scoped_to_filters(client):
     r = client.post("/api/feed/read-all", params={"region": "海外"}).json()
     assert r["marked"] == 1
     assert query_one("SELECT is_read FROM items WHERE title='海外未读'")["is_read"] == 1
+
+
+def test_feed_category_filter_no_500(client):
+    """回归：分类过滤曾因列名歧义（items/hotspots 都有 category）必然 500。"""
+    _seed_items()  # category=大模型
+    from app.db import execute
+
+    execute(
+        "INSERT INTO hotspots(title, why, angles, suggested_length, score, day, created_at, updated_at, category) "
+        "VALUES ('某热点', 'w', '[]', '30s', 90, '2026-10-03', 'x', 'x', '大模型')"
+    )
+    r = client.get("/api/feed", params={"category": "大模型"})
+    assert r.status_code == 200  # 修复前此处 500
+    body = r.json()
+    assert body["total"] == 3
+    assert all(i["category"] == "大模型" for i in body["items"])
