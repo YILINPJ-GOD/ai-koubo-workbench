@@ -142,3 +142,20 @@ def test_host_header_validation():
         # 恶意 host 被拒
         r = c.get("/api/health", headers={"Host": "evil.example"})
         assert r.status_code == 400
+
+
+def test_startup_bat_no_browser_loop():
+    """回归：看护循环重启服务时不得反复弹浏览器（用户报告"一直在重复打开"）。
+
+    浏览器打开必须在 :loop 之前只出现一次，且循环前要有端口占用检测。
+    """
+    from pathlib import Path
+
+    bat = Path(__file__).resolve().parent.parent / "启动.bat"
+    text = bat.read_text(encoding="utf-8")
+    # 看护循环体内不得有浏览器打开命令（修：服务重启时反复弹浏览器）
+    loop_body = text.split(":loop", 1)[1]
+    assert "start \"\"" not in loop_body
+    # 端口占用检测存在，且在 :loop 之前（已有实例只开页面不起服务）
+    assert "netstat" in text and "findstr" in text
+    assert text.index("netstat") < text.index(":loop")
