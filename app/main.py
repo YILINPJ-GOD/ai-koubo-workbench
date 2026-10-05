@@ -7,6 +7,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+
 from .config import db_path, ensure_dirs
 from .db import init_db
 from .api import backup, feed, hotspots, packs, settings, styles, system, today
@@ -30,6 +32,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI口播工作台", lifespan=lifespan)
+
+# 防 DNS rebinding：只接受本机 Host 头（审查F2）
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["127.0.0.1:8787", "localhost:8787", "testserver"],
+)
 
 app.include_router(system.router, prefix="/api")
 app.include_router(today.router, prefix="/api")

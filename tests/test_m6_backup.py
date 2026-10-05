@@ -139,3 +139,61 @@ def test_backup_list_api(client):
     body = client.get("/api/backup/list").json()
     assert len(body["backups"]) >= 1
     assert body["meta"]["items"] == 1
+
+
+# ---------- 安全加固（独立审查发现：F1 zip slip / F8 句柄 / M4 WAL） ----------
+
+def test_import_rejects_zip_slip(fresh_db):
+    """恶意 zip 的 images/../../xxx 条目被拒绝落盘（审查F1 zip slip）。"""
+    from app.services import backup
+
+    evil = fresh_db / "evil.zip"
+    with zipfile.ZipFile(evil, "w") as zf:
+        zf.writestr("workbench.db", b"fake")
+        zf.writestr("images/../../evil.bat", b"malicious")
+
+    backup.import_backup(evil)
+    # 恶意文件没有写到 data 目录外
+    assert not (fresh_db / "evil.bat").exists()
+    assert not (fresh_db.parent / "evil.bat").exists()
+    assert not (fresh_db / "home" / "data" / "images" / "evil.bat").exists()
+
+
+def test_import_cleans_stale_wal(fresh_db):
+    """导入后清理旧 -wal/-shm，防旧帧重放（审查M4/F9）。"""
+    from app.services import backup
+
+    good = fresh_db / "good.zip"
+    with zipfile.ZipFile(good, "w") as zf:
+        zf.writestr("workbench.db", b"new-db-content")
+    data_dir = fresh_db / "home" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "workbench.db-wal").write_bytes(b"stale-wal")
+    (data_dir / "workbench.db-shm").write_bytes(b"stale-shm")
+
+    backup.import_backup(good)
+    assert not (data_dir / "workbench.db-wal").exists()
+    assert not (data_dir / "workbench.db-shm").exists()
+
+
+def test_backup_db_consistent_under_wal(fresh_db):
+    """运行期备份走 sqlite backup API：WAL 未合并时也能拿到一致快照。"""
+    import sqlite3
+
+    from app.db import execute
+    from app.services import backup
+
+    execute("INSERT INTO items(source_key, source_type, title, url, summary, category, fetched_at, day) "
+            "VALUES ('qbitai','media','wal测试','http://w/1','s','大模型','x','2026-10-04')")
+    # 制造未 checkpoint 的 WAL 内容：写入后不关闭连接就备份
+    conn = sqlite3.connect(str(fresh_db / "home" / "data" / "workbench.db"))
+    conn.execute("INSERT INTO items(source_key, source_type, title, url, summary, category, fetched_at, day) "
+                 "VALUES ('qbitai','media','wal内写入','http://w/2','s','大模型','x','2026-10-04')")
+    conn.commit()
+    p = backup.backup_db(tag="wal-test")
+    # 保持 conn 打开（模拟运行期）
+    check = sqlite3.connect(str(p))
+    n = check.execute("SELECT COUNT(*) FROM items WHERE title='wal内写入'").fetchone()[0]
+    check.close()
+    conn.close()
+    assert n == 1  # backup API 拿到了 WAL 里的数据（裸拷贝可能拿不到）

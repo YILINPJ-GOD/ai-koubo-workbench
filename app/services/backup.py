@@ -18,14 +18,24 @@ KEEP = 7  # PD.md 7.2：滚动保留最近 7 份
 
 
 def backup_db(tag: str = "auto") -> Path:
-    """复制数据库文件到 backups/，返回备份文件路径。"""
+    """备份数据库到 backups/（sqlite backup API，WAL 模式下也一致），返回备份文件路径。"""
+    import sqlite3
+
     ensure_dirs()
     src = db_path()
     if not src.exists():
         raise FileNotFoundError("数据库文件不存在，无法备份")
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     dst = backups_dir() / f"workbench-{stamp}-{tag}.db"
-    shutil.copy2(src, dst)
+    src_conn = sqlite3.connect(str(src))
+    try:
+        dst_conn = sqlite3.connect(str(dst))
+        try:
+            src_conn.backup(dst_conn)
+        finally:
+            dst_conn.close()
+    finally:
+        src_conn.close()
     _rotate()
     return dst
 
@@ -81,10 +91,19 @@ def import_backup(zip_path: Path) -> dict:
             zf.extract("config.json", data)
         for name in names:
             if name.startswith("images/") and not name.endswith("/"):
-                target = data / name
+                # zip slip 净化：拒绝路径穿越组件（审查F1）
+                rel = Path(name).relative_to("images")
+                if ".." in rel.parts or rel.is_absolute() or not rel.name:
+                    continue
+                target = data / "images" / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with zf.open(name) as src, open(target, "wb") as dst:
                     shutil.copyfileobj(src, dst)
+        # 清理旧 WAL/SHM：防止旧帧重放到新库上（审查M4/F9）
+        for suffix in ("-wal", "-shm"):
+            stale = data / f"workbench.db{suffix}"
+            if stale.exists():
+                stale.unlink()
         return {
             "restored": [n for n in names if not n.endswith("/")],
             "safety_backup": str(safety),

@@ -1,4 +1,5 @@
 """素材包接口：生成（任务）、读取、选图、重新生成、图片文件与打包下载。"""
+import os
 import tempfile
 import zipfile
 from pathlib import Path
@@ -72,9 +73,15 @@ def image_file(pack_id: int, idx: int):
     if not cache.exists():
         try:
             with httpx.Client(headers={"User-Agent": "Mozilla/5.0"}, timeout=15, follow_redirects=True) as client:
-                r = client.get(c["url"])
-                r.raise_for_status()
-                cache.write_bytes(r.content)
+                with client.stream("GET", c["url"]) as r:
+                    r.raise_for_status()
+                    ctype = r.headers.get("content-type", "")
+                    if ctype and not ctype.startswith("image/"):
+                        raise HTTPException(status_code=415, detail="链接不是图片")
+                    data = r.read()
+                    if len(data) > 20 * 1024 * 1024:
+                        raise HTTPException(status_code=413, detail="图片超过20MB，跳过")
+                cache.write_bytes(data)
         except Exception as e:  # noqa: BLE001
             raise HTTPException(status_code=502, detail=f"图片下载失败：{e}")
     return FileResponse(cache, filename=f"image_{idx + 1}.png")
@@ -95,7 +102,9 @@ def download_selected(pack_id: int):
     if not selected:
         raise HTTPException(status_code=400, detail="尚未勾选任何配图")
 
-    tmp = Path(tempfile.mkstemp(suffix=".zip")[1])
+    _fd, tmp_name = tempfile.mkstemp(suffix=".zip")
+    os.close(_fd)  # 立即关闭句柄，否则 Windows 上 unlink 报 WinError 32（审查F8）
+    tmp = Path(tmp_name)
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
         for i in selected:
             if i >= len(candidates):

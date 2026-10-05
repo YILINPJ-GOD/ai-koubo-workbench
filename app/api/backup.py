@@ -1,4 +1,5 @@
 """备份与恢复接口：导出 zip、导入恢复、清空数据（PD.md 第 7 节）。"""
+import os
 import tempfile
 from pathlib import Path
 
@@ -18,7 +19,9 @@ def list_backups():
 
 @router.post("/backup/export")
 def export_backup():
-    tmp = Path(tempfile.mkstemp(suffix=".zip")[1])
+    _fd, tmp_name = tempfile.mkstemp(suffix=".zip")
+    os.close(_fd)  # 立即关闭句柄，否则 Windows 上 unlink 报 WinError 32（审查F8）
+    tmp = Path(tmp_name)
     backup.export_backup(tmp)
     return FileResponse(
         tmp,
@@ -38,7 +41,9 @@ def _cleanup(path: Path):
 def import_backup(file: UploadFile):
     if not file.filename or not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="请选择 .zip 备份文件")
-    tmp = Path(tempfile.mkstemp(suffix=".zip")[1])
+    _fd, tmp_name = tempfile.mkstemp(suffix=".zip")
+    os.close(_fd)  # 立即关闭句柄，否则 Windows 上 unlink 报 WinError 32（审查F8）
+    tmp = Path(tmp_name)
     try:
         tmp.write_bytes(file.file.read())
         result = backup.import_backup(tmp)
