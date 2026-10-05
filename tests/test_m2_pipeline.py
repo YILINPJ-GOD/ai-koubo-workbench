@@ -517,6 +517,11 @@ def test_promote_item_to_hotspot(client):
     body = client.get("/api/todo").json()
     assert body["todos"] == []
 
+    # 重复点击转选题：返回同一张卡，不产生重复（审查L8）
+    r2 = client.post(f"/api/items/{ids[0]}/promote")
+    assert r2.json()["hotspot_id"] == hid
+    assert r2.json().get("existed") is True
+
 
 def test_item_region_from_content(fresh_db, monkeypatch):
     """region 按内容主体判定（LLM 输出），而不是媒体站点国籍。"""
@@ -567,13 +572,10 @@ def test_read_all_scoped_to_filters(client):
     from app.db import execute, query_one
 
     ids = _seed_items()  # 3 条国内 qbitai，category=大模型
-    from app.db import query as _q
-    print("DBG after seed:", [(r["id"], r["is_read"]) for r in _q("SELECT id, is_read FROM items")])
     execute(
         "INSERT INTO items(source_key, source_type, title, url, summary, category, fetched_at, day, region) "
         "VALUES ('hackernews','overseas','海外未读','http://hn/9','sum','AI产品','x','2026-10-03','海外')"
     )
-    print("DBG after insert:", [(r["id"], r["is_read"]) for r in _q("SELECT id, is_read FROM items")])
 
     # 在 category=大模型 筛选下点全部已读
     r = client.post("/api/feed/read-all", params={"category": "大模型"}).json()

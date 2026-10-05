@@ -62,7 +62,11 @@ def get_pack(hotspot_id: int) -> dict | None:
 
 
 def mark_shot(hotspot_id: int) -> dict | None:
-    execute("UPDATE hotspots SET status='shot', updated_at=? WHERE id=?", (_now(), hotspot_id))
+    # 已拍退出必做/备选，把名额让给递补（审查L5：已拍占坑）
+    execute(
+        "UPDATE hotspots SET status='shot', is_must=0, is_backup=0, updated_at=? WHERE id=?",
+        (_now(), hotspot_id),
+    )
     return get_hotspot(hotspot_id)
 
 

@@ -69,6 +69,9 @@ def promote_to_hotspot(item_id: int):
     item = query_one("SELECT * FROM items WHERE id=?", (item_id,))
     if not item:
         raise HTTPException(status_code=404, detail="资讯不存在")
+    if item.get("event_id"):
+        # 已转过的直接返回原卡（审查L8：双击产生重复卡）
+        return {"hotspot_id": item["event_id"], "existed": True}
     now = datetime.now().isoformat(timespec="seconds")
     hid = execute(
         """INSERT INTO hotspots(title, category, why, angles, suggested_length, score,

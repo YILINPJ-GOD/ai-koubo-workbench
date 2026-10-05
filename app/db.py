@@ -21,8 +21,8 @@ def init_db() -> None:
     conn = connect()
     try:
         conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-        _migrate(conn)
         _seed_sources(conn)
+        _migrate(conn)
         conn.commit()
     finally:
         conn.close()

@@ -34,7 +34,9 @@ def _entry_time(entry) -> str:
         tp = getattr(entry, attr, None)
         if tp:
             try:
-                return datetime.fromtimestamp(time.mktime(tp), tz=timezone.utc).isoformat()
+                from calendar import timegm
+
+                return datetime.fromtimestamp(timegm(tp), tz=timezone.utc).isoformat()
             except (OverflowError, ValueError):
                 pass
     return ""

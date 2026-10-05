@@ -47,11 +47,11 @@ def _today() -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
 
-def fetch_today_items() -> list[dict]:
+def fetch_today_items(day: str = "") -> list[dict]:
     return query(
         "SELECT id, title, summary, category, source_type, source_key, image_url "
         "FROM items WHERE day=? ORDER BY id",
-        (_today(),),
+        (day or _today(),),
     )
 
 
@@ -361,12 +361,15 @@ def merge_events_locally(events: list[dict], threshold: float = 0.75) -> list[di
 CHUNK_SIZE = 25  # 单次 LLM 聚合的条目数上限，防止超长输出卡死
 
 
-def cluster_and_store(job_id: str = "", llm=None) -> dict:
-    """刷新流水线末尾调用：分批聚合今天条目 → 本地合并 → 热点卡落库。"""
+def cluster_and_store(job_id: str = "", llm=None, run_day: str = "") -> dict:
+    """刷新流水线末尾调用：分批聚合当天条目 → 本地合并 → 热点卡落库。
+
+    run_day：本次刷新开始时的日期。跨午夜跑完时仍聚合开跑那天的条目（审查L10）。
+    """
     from ..llm import get_llm
     from ..services import jobs
 
-    items = fetch_today_items()
+    items = fetch_today_items(run_day)
     if not items:
         set_state(f"empty_reason_{_today()}", "今天还没有抓到任何资讯")
         return {"new": 0, "merged": 0}

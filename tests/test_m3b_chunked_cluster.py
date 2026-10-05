@@ -692,3 +692,38 @@ def test_merged_event_keeps_must_flag(fresh_db, monkeypatch):
     row = query_one("SELECT * FROM hotspots WHERE id=?", (old_id,))
     assert row["is_must"] == 1  # 修复前：标题回查 miss，标记丢失
     assert row["score"] == 99
+
+
+def test_mark_shot_frees_must_slot(fresh_db):
+    """已拍退出必做（审查L5：已拍占坑导致少递补）。"""
+    from app.db import query_one
+    from app.services.hotspots import mark_shot
+
+    hid = query_one("SELECT 1") and None
+    from app.db import execute
+
+    hid = execute(
+        "INSERT INTO hotspots(title, why, angles, suggested_length, score, day, created_at, updated_at, status, is_must) "
+        "VALUES ('拍完的卡', 'w', '[]', '30s', 90, '2026-10-04', 'x', 'x', 'pending', 1)"
+    )
+    mark_shot(hid)
+    row = query_one("SELECT status, is_must FROM hotspots WHERE id=?", (hid,))
+    assert row["status"] == "shot"
+    assert row["is_must"] == 0
+
+
+def test_timezone_utc_offset():
+    """RSS 发布时间用 timegm（UTC）而非 mktime（本地时区），不再平移8小时（审查L1）。"""
+    import calendar
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from app.pipeline.fetchers import _entry_time
+
+    # 2026-10-01 00:00:00 UTC（feedparser entry 的 published_parsed）
+    tp = time.struct_time((2026, 10, 1, 0, 0, 0, 3, 274, 0))
+    got = _entry_time(SimpleNamespace(published_parsed=tp))
+    expect = datetime.fromtimestamp(calendar.timegm(tp), tz=timezone.utc).isoformat()
+    assert got == expect
+    # 东八区机器上旧实现会把它平移成前一日 16:00（+8h 偏差），新实现不应
+    assert got.startswith("2026-10-01T00:00:00+00:00")

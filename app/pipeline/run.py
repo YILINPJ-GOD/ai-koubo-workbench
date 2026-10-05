@@ -143,10 +143,11 @@ def refresh_pipeline(job_id: str) -> dict:
     stats["kept"] = kept
 
     # M3 聚合打分：失败不阻塞刷新（无 key / 网络问题降级为仅抓取）
+    # 传入本次抓取的 day：23:59 开跑 00:01 聚类时不会丢掉昨夜条目（审查L10）
     try:
         from .cluster import cluster_and_store
 
-        stats.update(cluster_and_store(job_id))
+        stats.update(cluster_and_store(job_id, run_day=_today()))
     except Exception as e:  # noqa: BLE001
         stats["cluster_error"] = str(e)
 

@@ -102,10 +102,22 @@ def load_config() -> dict:
 
 
 def save_config(cfg: dict) -> None:
+    import os
+    import tempfile
+
     ensure_dirs()
-    config_path().write_text(
-        json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    # 原子写：断电/崩溃不会丢 API key（审查L12）
+    fd, tmp = tempfile.mkstemp(dir=data_dir(), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(cfg, ensure_ascii=False, indent=2))
+        os.replace(tmp, config_path())
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def update_config(patch: dict) -> dict:
