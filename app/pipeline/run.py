@@ -81,6 +81,8 @@ def refresh_pipeline(job_id: str) -> dict:
                 per["error"] = str(e)
             except KeyError:
                 per["error"] = "未知抓取源"
+            except Exception as e:  # noqa: BLE001 —— 单源异常形状不拖垮整次刷新（审查M2）
+                per["error"] = f"{type(e).__name__}: {str(e)[:60]}"
             stats["per_source"][key] = per
 
     stats["raw"] = len(drafts_all)

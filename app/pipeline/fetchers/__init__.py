@@ -128,6 +128,8 @@ def fetch_baidu_hot(client) -> list[dict]:
 
 
 def parse_baidu_hot(data: dict) -> list[dict]:
+    if not isinstance(data, dict) or not isinstance(data.get("data"), dict):
+        raise ValueError("接口返回形状异常")
     drafts = []
     for card in data.get("data", {}).get("cards", []):
         for item in card.get("content", []):
@@ -162,6 +164,8 @@ def fetch_weibo_hot(client) -> list[dict]:
 
 
 def parse_weibo_hot(data: dict) -> list[dict]:
+    if not isinstance(data, dict) or not isinstance(data.get("data"), dict):
+        raise ValueError("接口返回形状异常")
     drafts = []
     for item in data.get("data", {}).get("realtime", []):
         word = (item.get("word") or "").strip()
@@ -187,6 +191,8 @@ def fetch_hackernews(client) -> list[dict]:
 
 
 def parse_hackernews(data: dict) -> list[dict]:
+    if not isinstance(data, dict) or not isinstance(data.get("hits"), list):
+        raise ValueError("接口返回形状异常")
     drafts = []
     for hit in data.get("hits", []):
         title = (hit.get("title") or "").strip()

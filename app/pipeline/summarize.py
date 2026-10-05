@@ -36,19 +36,7 @@ def summarize_items(items: list[dict], llm) -> dict[int, dict]:
         user = "待处理资讯列表：\n" + json.dumps(payload, ensure_ascii=False)
         try:
             data = llm.chat_json(SYSTEM, user)
-            for row in data.get("results", []):
-                i = row.get("i")
-                if i is None:
-                    continue
-                if str(row.get("category", "")).strip() == "无关":
-                    continue
-                result[int(i)] = {
-                    "summary": str(row.get("summary", "")).strip()[:60],
-                    "category": str(row.get("category", "")).strip(),
-                    "summary_zh": str(row.get("summary_zh", "")).strip(),
-                    "region": str(row.get("region", "")).strip(),
-                }
-        except Exception:  # noqa: BLE001 —— 单批失败不丢条目：标题降级，不阻塞流水线
+        except Exception:  # noqa: BLE001 —— 整批失败才标题降级
             for it in chunk:
                 result[it["i"]] = {
                     "summary": it["title"][:40],
@@ -56,4 +44,20 @@ def summarize_items(items: list[dict], llm) -> dict[int, dict]:
                     "summary_zh": "",
                     "region": "",
                 }
+            continue
+        for row in data.get("results", []) if isinstance(data, dict) else []:
+            i = row.get("i")
+            # 单条坏序号只跳过该条（审查M3：此前会连累整批好数据一起降级）
+            try:
+                idx = int(i)
+            except (TypeError, ValueError):
+                continue
+            if str(row.get("category", "")).strip() == "无关":
+                continue
+            result[idx] = {
+                "summary": str(row.get("summary", "")).strip()[:60],
+                "category": str(row.get("category", "")).strip(),
+                "summary_zh": str(row.get("summary_zh", "")).strip(),
+                "region": str(row.get("region", "")).strip(),
+            }
     return result

@@ -36,6 +36,9 @@ def get_json(client: httpx.Client, url: str, referer: str = "") -> dict:
     import json
 
     try:
-        return json.loads(text)
+        parsed = json.loads(text)
     except json.JSONDecodeError as e:
         raise SourceError("返回的不是 JSON") from e
+    if not isinstance(parsed, dict):
+        raise SourceError("返回的 JSON 形状异常")
+    return parsed

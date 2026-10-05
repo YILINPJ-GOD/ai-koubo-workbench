@@ -602,3 +602,52 @@ def test_feed_category_filter_no_500(client):
     body = r.json()
     assert body["total"] == 3
     assert all(i["category"] == "大模型" for i in body["items"])
+
+
+# ---------- 抓取/摘要健壮性（审查M2/M3） ----------
+
+def test_parse_hot_rejects_null_shape():
+    """热搜接口返回 data:null 时抛 ValueError（由 run 兜底），不再 AttributeError 炸全场。"""
+    import pytest
+
+    from app.pipeline.fetchers import parse_baidu_hot, parse_hackernews, parse_weibo_hot
+
+    for fn in (parse_baidu_hot, parse_weibo_hot):
+        with pytest.raises(ValueError):
+            fn({"data": None})
+    with pytest.raises(ValueError):
+        parse_hackernews({"hits": None})
+    with pytest.raises(ValueError):
+        parse_hackernews([1, 2])  # 非 dict
+
+
+def test_summarize_bad_index_only_skips_one():
+    """LLM 返回一个坏序号：只跳过该条，好数据不再整批降级（审查M3）。"""
+    items = [{"i": i, "title": f"标题{i}", "text": "t", "overseas": False} for i in range(3)]
+    llm = FakeLLM([{"results": [
+        {"i": 0, "summary": "好摘要0", "category": "大模型", "summary_zh": ""},
+        {"i": "bad", "summary": "坏序号", "category": "大模型", "summary_zh": ""},
+        {"i": 2, "summary": "好摘要2", "category": "AI产品", "summary_zh": ""},
+    ]}])
+    out = summarize_items(items, llm)
+    assert out[0]["summary"] == "好摘要0"
+    assert out[2]["summary"] == "好摘要2"
+    assert 1 not in out  # 坏序号条目跳过（走标题降级由上层处理）
+
+
+def test_refresh_survives_fetcher_crash(fresh_db, monkeypatch):
+    """单源抛非 SourceError 异常：其余源照常，fetch_runs 正常收尾（审查M2）。"""
+    from app.pipeline import run as run_mod
+
+    def boom(client):
+        raise AttributeError("'NoneType' object has no attribute 'get'")
+
+    monkeypatch.setattr(run_mod, "FETCHERS", {"baidu_hot": boom})
+    monkeypatch.setattr(run_mod, "_summarize_with_fallback", lambda d: {})
+
+    result = run_mod.refresh_pipeline("job")
+    assert result["stats"]["per_source"]["baidu_hot"]["error"].startswith("AttributeError")
+
+    from app.db import query_one
+    row = query_one("SELECT status FROM fetch_runs ORDER BY id DESC LIMIT 1")
+    assert row["status"] == "done"  # 修复前永久 running
