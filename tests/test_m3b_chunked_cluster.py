@@ -667,3 +667,28 @@ def test_backfill_requires_sources(fresh_db):
     musts = {r["title"] for r in query("SELECT title FROM hotspots WHERE is_must=1")}
     assert "有源卡" in musts
     assert "孤卡高分" not in musts
+
+
+def test_merged_event_keeps_must_flag(fresh_db, monkeypatch):
+    """回归（审查M1）：事件合并进旧卡（标题未变）时，必做标记不再按标题回查而丢失。"""
+    from app.db import execute, query_one
+    from app.pipeline.cluster import upsert_hotspots
+
+    # 昨天的旧卡，标题 A
+    old_id = execute(
+        "INSERT INTO hotspots(title, why, angles, suggested_length, score, day, created_at, updated_at, status, category) "
+        "VALUES ('OpenAI发布GPT-5全面评测报告', '', '[]', '30s', 80, '2026-10-02', 'x', '2026-10-02T08:00:00', 'pending', '大模型')"
+    )
+    _seed_items(1)
+
+    # 今天 LLM 返回相似变体标题（命中合并），score 99 选为必做
+    events = [{
+        "title": "OpenAI发布GPT-5全面评测报告（更新版）", "why": "w", "angles": [],
+        "suggested_length": "30s", "score": 99, "item_ids": [1], "sequel_of": "",
+        "category": "大模型",
+    }]
+    upsert_hotspots(events)
+
+    row = query_one("SELECT * FROM hotspots WHERE id=?", (old_id,))
+    assert row["is_must"] == 1  # 修复前：标题回查 miss，标记丢失
+    assert row["score"] == 99

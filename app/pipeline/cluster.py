@@ -206,6 +206,7 @@ def upsert_hotspots(events: list[dict], llm_unused=None) -> dict:
                 )
                 hotspot_id = existing["id"]
                 stats["merged"] += 1
+                ev["hotspot_id"] = hotspot_id
             else:
                 hotspot_id = conn.execute(
                     """INSERT INTO hotspots(title, category, why, angles, suggested_length, score,
@@ -217,6 +218,7 @@ def upsert_hotspots(events: list[dict], llm_unused=None) -> dict:
                      sequel_id, now, now),
                 ).lastrowid
                 stats["new"] += 1
+                ev["hotspot_id"] = hotspot_id
                 recent_rows = [dict(r) for r in recent_rows]
                 recent_rows.append({"id": hotspot_id, "title": ev["title"]})
             # 资讯条目挂到热点卡（feed 页跳转、来源聚合依赖此关联）
@@ -315,21 +317,17 @@ def _apply_flags(conn, events, must_idx, backup_idx, stats) -> None:
     )
     must_idx = [i for i in must_idx if not events[i].get("unusable")]
     backup_idx = [i for i in backup_idx if not events[i].get("unusable")]
+    # 用落库时记录的真实 hotspot_id 打标记：合并进旧卡的事件标题未变，
+    # 按标题回查会 miss（审查发现 M1：合并卡必做标记静默丢失）
     for idx in must_idx:
-        ev = events[idx]
-        row = conn.execute(
-            "SELECT id FROM hotspots WHERE title=? ORDER BY id DESC LIMIT 1", (ev["title"],)
-        ).fetchone()
-        if row:
-            conn.execute("UPDATE hotspots SET is_must=1 WHERE id=?", (row["id"],))
+        hid = events[idx].get("hotspot_id")
+        if hid:
+            conn.execute("UPDATE hotspots SET is_must=1 WHERE id=?", (hid,))
             stats["must"] += 1
     for idx in backup_idx:
-        ev = events[idx]
-        row = conn.execute(
-            "SELECT id FROM hotspots WHERE title=? ORDER BY id DESC LIMIT 1", (ev["title"],)
-        ).fetchone()
-        if row:
-            conn.execute("UPDATE hotspots SET is_backup=1 WHERE id=?", (row["id"],))
+        hid = events[idx].get("hotspot_id")
+        if hid:
+            conn.execute("UPDATE hotspots SET is_backup=1 WHERE id=?", (hid,))
             stats["backup"] += 1
 
 
