@@ -674,10 +674,14 @@ def test_merged_event_keeps_must_flag(fresh_db, monkeypatch):
     from app.db import execute, query_one
     from app.pipeline.cluster import upsert_hotspots
 
-    # 昨天的旧卡，标题 A
+    # 两天前的旧卡（在近3天合并窗口内），标题 A
+    from datetime import datetime as _dt, timedelta as _td
+
+    two_days_ago = (_dt.now() - _td(days=2)).strftime("%Y-%m-%d")
     old_id = execute(
         "INSERT INTO hotspots(title, why, angles, suggested_length, score, day, created_at, updated_at, status, category) "
-        "VALUES ('OpenAI发布GPT-5全面评测报告', '', '[]', '30s', 80, '2026-10-02', 'x', '2026-10-02T08:00:00', 'pending', '大模型')"
+        "VALUES ('OpenAI发布GPT-5全面评测报告', '', '[]', '30s', 80, ?, 'x', ?, 'pending', '大模型')",
+        (two_days_ago, two_days_ago + "T08:00:00"),
     )
     _seed_items(1)
 
