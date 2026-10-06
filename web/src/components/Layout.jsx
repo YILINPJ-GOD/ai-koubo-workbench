@@ -5,7 +5,6 @@ import { useToast } from '../toast'
 const NAV = [
   { to: '/', label: '今日', end: true },
   { to: '/hotspots', label: '热点' },
-  { to: '/feed', label: '资讯' },
   { to: '/styles', label: '拆解库' },
   { to: '/settings', label: '设置' },
 ]
@@ -19,7 +18,7 @@ function RefreshButton() {
   const progress = job?.total ? `${Math.min(job.done ?? 0, job.total)}/${job.total}` : ''
   const pct = job?.total ? Math.round(((job.done ?? 0) / job.total) * 100) : 0
 
-  if (!enabled && !['/', '/feed', '/hotspots'].includes(location.pathname)) return null
+  if (!enabled && !['/', '/hotspots'].includes(location.pathname)) return null
 
   return (
     <div className="flex items-center gap-3">

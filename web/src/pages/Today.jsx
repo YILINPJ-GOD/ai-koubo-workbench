@@ -89,7 +89,7 @@ function TodoSection({ todos }) {
     <div className="card p-4">
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-sm font-semibold">今日待办（{todos.length}）—— 收藏的资讯，可转为选题</h2>
-        <Link to="/feed" className="text-xs text-brand-600 hover:underline">去资讯页收藏更多 →</Link>
+        <Link to="/hotspots?view=feed" className="text-xs text-brand-600 hover:underline">去资讯页收藏更多 →</Link>
       </div>
       <div className="space-y-1">
         {todos.map((t) => (
@@ -219,7 +219,7 @@ export default function Today() {
             <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">{data.empty_reason}</p>
             <div className="mt-4 flex justify-center gap-2">
               <button className="btn-ghost" onClick={reevaluate}>重新评估一次</button>
-              <Link to="/feed" className="btn-primary">去资讯流水逛逛 →</Link>
+              <Link to="/hotspots?view=feed" className="btn-primary">去资讯流水逛逛 →</Link>
             </div>
           </div>
         )

@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useToast } from '../toast'
+import Feed from './Feed'
 import { StatusBadge } from './Today'
 
 function HotspotRow({ h }) {
@@ -46,7 +47,7 @@ function HotspotRow({ h }) {
   )
 }
 
-export default function Hotspots() {
+function HotspotList() {
   // 默认"今日活跃"：与首页必做同一池子（昨日至今更新过、未过时）
   const [tab, setTab] = useState('active')
   const status = tab === 'active' ? '' : tab
@@ -94,6 +95,31 @@ export default function Hotspots() {
             </div>
           ))}
       </div>
+    </div>
+  )
+}
+
+/** 热点 / 资讯 合并页：顶部两个视图，资讯原样内嵌（含归档树与筛选）。 */
+export default function Hotspots() {
+  const [sp, setSp] = useSearchParams()
+  const view = sp.get('view') === 'feed' ? 'feed' : 'hotspots'
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {[
+          ['hotspots', '热点选题'],
+          ['feed', 'AI 资讯'],
+        ].map(([v, label]) => (
+          <button
+            key={v}
+            className={`chip ${view === v ? 'chip-on' : 'chip-off'}`}
+            onClick={() => setSp(v === 'feed' ? { view: 'feed' } : {})}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {view === 'feed' ? <Feed /> : <HotspotList />}
     </div>
   )
 }

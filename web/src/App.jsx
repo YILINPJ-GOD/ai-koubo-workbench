@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
+import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
-import Feed from './pages/Feed'
 import HotspotDetail from './pages/HotspotDetail'
 import Hotspots from './pages/Hotspots'
 import Settings from './pages/Settings'
@@ -25,7 +24,7 @@ export default function App() {
               <Route path="/" element={<Today />} />
               <Route path="/hotspots" element={<Hotspots />} />
               <Route path="/hotspots/:id" element={<HotspotDetail />} />
-              <Route path="/feed" element={<Feed />} />
+              <Route path="/feed" element={<Navigate to="/hotspots?view=feed" replace />} />
               <Route path="/styles" element={<Styles />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
