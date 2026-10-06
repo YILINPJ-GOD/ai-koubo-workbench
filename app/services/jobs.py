@@ -6,7 +6,7 @@ from datetime import datetime
 
 _lock = threading.Lock()
 _jobs: dict[str, dict] = {}
-_JOB_TTL = 200  # 完成后保留秒数，供前端最后一次拉取
+_JOB_TTL = 3600  # 完成后保留秒数。素材包生成 2~5 分钟且提示"可离开页面"，标签页休眠回来还要能拿到结果
 _finished_at: dict[str, float] = {}
 
 

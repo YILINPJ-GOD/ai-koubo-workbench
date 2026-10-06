@@ -159,3 +159,30 @@ def test_startup_bat_no_browser_loop():
     # 端口占用检测存在，且在 :loop 之前（已有实例只开页面不起服务）
     assert "netstat" in text and "findstr" in text
     assert text.index("netstat") < text.index(":loop")
+
+
+def test_job_result_survives_tab_sleep(monkeypatch):
+    """结果保留 1 小时：浏览器标签页休眠几分钟回来，任务结果不能被 GC 掉。"""
+    from datetime import datetime
+
+    from app.services import jobs
+
+    jid = jobs.start_job(lambda job_id: "结果")
+    assert jobs.get_job(jid) is not None  # 等线程落地
+    deadline = time.time() + 5
+    while time.time() < deadline and jobs.get_job(jid)["status"] == "running":
+        time.sleep(0.05)
+
+    # 模拟"完成 300 秒后"（旧 TTL 200 秒会被清掉）
+    with jobs._lock:
+        jobs._finished_at[jid] = datetime.now().timestamp() - 300
+    with jobs._lock:
+        jobs._gc_locked()
+    assert jobs.get_job(jid) is not None, "完成300秒后结果不应被清理"
+
+    # 超过 1 小时的才清
+    with jobs._lock:
+        jobs._finished_at[jid] = datetime.now().timestamp() - 3601
+    with jobs._lock:
+        jobs._gc_locked()
+    assert jobs.get_job(jid) is None
