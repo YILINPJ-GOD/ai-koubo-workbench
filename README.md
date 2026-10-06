@@ -48,6 +48,6 @@
 
 - 技术栈：FastAPI + SQLite（后端，`app/`）、React + Vite + Tailwind（前端，`web/`）
 - 开发依赖：`pip install -r requirements.txt -r requirements-dev.txt`
-- 运行测试：`python -m pytest tests/ -q`（166 条）
+- 运行测试：`python -m pytest tests/ -q`（174 条）
 - 需求文档：`PD.md`；页面设计：`docs/页面结构与交互设计.md`；开发计划：`docs/开发计划.md`；验收走查：`docs/验收走查.md`
 - v1.5 规划：蹲点日历、抖音链接自动转写进拆解库；v2：效果回流
