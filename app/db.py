@@ -41,6 +41,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE items ADD COLUMN todo_done INTEGER DEFAULT 0")
     if "region" not in icols2:
         conn.execute("ALTER TABLE items ADD COLUMN region TEXT DEFAULT ''")
+    pcols = {r[1] for r in conn.execute("PRAGMA table_info(packs)")}
+    if "outline" not in pcols:
+        conn.execute("ALTER TABLE packs ADD COLUMN outline TEXT DEFAULT '{}'")
     scols = {r[1] for r in conn.execute("PRAGMA table_info(sources)")}
     if "region" not in scols:
         conn.execute("ALTER TABLE sources ADD COLUMN region TEXT DEFAULT ''")

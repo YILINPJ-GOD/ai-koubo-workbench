@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, runJob, usePollWhile } from '../api'
+import Teleprompter from './Teleprompter'
 import { useToast } from '../toast'
 import { StatusBadge } from './Today'
 
@@ -169,8 +170,10 @@ export default function HotspotDetail() {
   const [slot, setSlot] = useState(null)
   const activeSlot = slot || data?.hotspot?.suggested_length || '30s'
   const [generating, setGenerating] = useState(false)
+  const [teleprompter, setTeleprompter] = useState(null) // {lines}
   const [genProgress, setGenProgress] = useState('')
   usePollWhile(generating, 2500)
+  usePollWhile(!!teleprompter, 800) // 提纲生成中轮询
 
   const genMutation = useMutation({
     mutationFn: () => api.post(`/api/hotspots/${id}/pack`, { style_id: styleId ? Number(styleId) : null }),
@@ -182,6 +185,32 @@ export default function HotspotDetail() {
       qc.invalidateQueries()
     },
   })
+
+  const openTeleprompter = async () => {
+    const packId = pack?.id
+    if (!packId) return
+    // 缓存命中直接开
+    try {
+      const cached = await api.post(`/api/packs/${packId}/outline`, { slot: activeSlot })
+      if (cached.lines) {
+        setTeleprompter({ lines: cached.lines, cached: true })
+        return
+      }
+    } catch {
+      /* 走任务流程 */
+    }
+    // 生成提纲（任务化，通常几秒）
+    const gen = useMutation({ mutationFn: () => api.post(`/api/packs/${packId}/outline`, { slot: activeSlot }) })
+    try {
+      await runJob(gen, { onJob: () => {}, pollMs: 1200 })
+      const detail = await api.get(`/api/hotspots/${id}`)
+      const lines = detail.pack?.outline?.[activeSlot] || []
+      if (lines.length) setTeleprompter({ lines })
+      else toast('提纲为空，请重试', 'error')
+    } catch (e) {
+      toast(e.message || '提纲生成失败', 'error')
+    }
+  }
 
   const generate = () => {
     if (generating) return
@@ -364,12 +393,21 @@ export default function HotspotDetail() {
                 <div className="card p-4">
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="text-sm font-semibold">口播稿（{activeSlot}）</h3>
-                    <button
-                      className="text-xs text-brand-600 hover:underline"
-                      onClick={() => copyText(toast, script, '口播稿已复制')}
-                    >
-                      复制
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="rounded bg-gray-900 px-2 py-0.5 text-xs text-amber-300"
+                        title="全屏提词器：逐句大字，拍摄时放在镜头旁"
+                        onClick={openTeleprompter}
+                      >
+                        📺 提词器
+                      </button>
+                      <button
+                        className="text-xs text-brand-600 hover:underline"
+                        onClick={() => copyText(toast, script, '口播稿已复制')}
+                      >
+                        复制
+                      </button>
+                    </div>
                   </div>
                   <p className="whitespace-pre-wrap text-sm leading-7">{highlightRisks(script, pack.risks)}</p>
                 </div>
@@ -451,6 +489,9 @@ export default function HotspotDetail() {
           )}
         </div>
       </div>
+      {teleprompter && (
+        <Teleprompter slot={activeSlot} lines={teleprompter.lines} onClose={() => setTeleprompter(null)} />
+      )}
     </div>
   )
 }

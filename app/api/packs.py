@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
 from .. import llm as llm_mod
+from ..llm import LLMError
 from ..services import jobs, packs
 
 router = APIRouter()
@@ -32,6 +33,56 @@ def generate(hotspot_id: int, body: dict | None = None):
     if get_hotspot(hotspot_id) is None:
         raise HTTPException(status_code=404, detail="热点不存在")
     job_id = jobs.start_job(_run_generation(hotspot_id, style_id), total=1, label="生成素材包")
+    return {"job_id": job_id}
+
+
+@router.post("/packs/{pack_id}/outline")
+def make_outline(pack_id: int, body: dict):
+    """拍摄提词用：把指定档位口播稿拆句并生成关键词提纲（缓存）。"""
+    import json as _json
+
+    from .. import llm as llm_mod
+    from ..db import query_one
+    from ..services.hotspots import get_outline, save_outline
+
+    slot = str(body.get("slot") or "30s")
+    if slot not in ("15s", "30s", "60s"):
+        raise HTTPException(status_code=400, detail="档位不合法")
+
+    row = query_one("SELECT scripts FROM packs WHERE id=?", (pack_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="素材包不存在")
+    script = (_json.loads(row["scripts"]).get(slot) or "").strip()
+    if not script:
+        raise HTTPException(status_code=400, detail=f"{slot} 档还没有口播稿")
+
+    cached = get_outline(pack_id, slot)
+    if cached:
+        return {"slot": slot, "lines": cached, "cached": True}
+
+    def _run(job_id: str):
+        from ..services import jobs as _jobs
+
+        _jobs.update_job(job_id, message="AI 正在提炼关键词提纲…")
+        llm = llm_mod.get_llm()
+        data = llm.chat_json(
+            "你是口播提词助手。把口播稿拆成适合提词的短句，每句给2-4个便于记忆的关键词。"
+            '严格输出 JSON：{"lines":[{"text":"原句","keys":["关键词","关键词"]}]}',
+            script,
+        )
+        lines = []
+        for ln in (data.get("lines") or [])[:40] if isinstance(data, dict) else []:
+            text = str(ln.get("text", "")).strip()
+            if not text:
+                continue
+            keys = [str(k).strip() for k in (ln.get("keys") or []) if str(k).strip()][:4]
+            lines.append({"text": text, "keys": keys})
+        if not lines:
+            raise LLMError("提纲生成结果为空，请重试")
+        save_outline(pack_id, slot, lines)
+        return {"slot": slot, "lines": lines, "cached": False}
+
+    job_id = jobs.start_job(_run, total=1, label="生成提纲")
     return {"job_id": job_id}
 
 

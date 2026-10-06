@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS packs (
   style_id         INTEGER,
   style_note       TEXT DEFAULT '',
   wordcount_ok     INTEGER DEFAULT 1,
+  outline          TEXT DEFAULT '{}',   -- 关键词提纲缓存 {"15s":[{"text","keys"}],...}
   created_at       TEXT NOT NULL,
   FOREIGN KEY(hotspot_id) REFERENCES hotspots(id)
 );

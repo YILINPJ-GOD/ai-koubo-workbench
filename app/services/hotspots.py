@@ -58,7 +58,37 @@ def get_pack(hotspot_id: int) -> dict | None:
         return None
     for key in ("scripts", "captions", "image_candidates", "image_selected", "publish", "risks", "checklist"):
         r[key] = json.loads(r[key] or ("{}" if key in ("scripts", "captions", "publish") else "[]"))
+    r["outline"] = json.loads(r["outline"] or "{}")
     return r
+
+
+def save_outline(pack_id: int, slot: str, lines: list) -> None:
+    """缓存关键词提纲（按档位）。"""
+    import json as _json
+
+    row = query_one("SELECT outline FROM packs WHERE id=?", (pack_id,))
+    if not row:
+        return
+    data = {}
+    try:
+        data = _json.loads(row["outline"] or "{}")
+    except (ValueError, TypeError):
+        data = {}
+    data[slot] = lines
+    execute("UPDATE packs SET outline=? WHERE id=?", (_json.dumps(data, ensure_ascii=False), pack_id))
+
+
+def get_outline(pack_id: int, slot: str) -> list | None:
+    import json as _json
+
+    row = query_one("SELECT outline FROM packs WHERE id=?", (pack_id,))
+    if not row:
+        return None
+    try:
+        data = _json.loads(row["outline"] or "{}")
+    except (ValueError, TypeError):
+        return None
+    return data.get(slot)
 
 
 def mark_shot(hotspot_id: int) -> dict | None:

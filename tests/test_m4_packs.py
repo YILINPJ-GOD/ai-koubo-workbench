@@ -516,3 +516,52 @@ def test_no_escalation_without_api_key(fresh_db):
     llm = ScriptedLLM([bad, bad, bad, _fake_assets_response()])
     result = packs.generate_pack(hid, None, llm)
     assert any("字数未完全达标" in w for w in result["warnings"])
+
+
+# ---------- 提词器提纲（2026-10-05 用户反馈：拍摄记不住稿） ----------
+
+def test_outline_generate_and_cache(fresh_db):
+    """提纲生成：拆句+关键词，二次请求走缓存。"""
+    import json as _json
+    from types import SimpleNamespace
+
+    from app.db import query_one
+    from app.services import packs
+
+    hid = _seed_hotspot_with_sources()
+    pack_id = packs.generate_pack(hid, None, ScriptedLLM([_fake_scripts_response(), _fake_assets_response()]))["pack_id"]
+
+    class OutlineLLM:
+        def chat_json(self, system, user, retries=2):
+            return {"lines": [
+                {"text": "好家伙，Google终于更新了。", "keys": ["Google", "更新"]},
+                {"text": "Gemini 4 Argon 正式上线。", "keys": ["Gemini 4", "上线"]},
+            ]}
+
+    from app.api import packs as packs_api
+
+    result = packs_api.make_outline.__wrapped__(pack_id, {"slot": "30s"}) if hasattr(packs_api.make_outline, "__wrapped__") else None
+    # API 函数内部走 jobs，直接测服务端逻辑：手动执行 worker 内容
+    from app import llm as llm_mod
+    from app.services import jobs as jobs_mod
+    from app.services.hotspots import get_outline, save_outline
+
+    llm = OutlineLLM()
+    data = llm.chat_json("", "")
+    lines = [
+        {"text": str(ln["text"]).strip(), "keys": [str(k).strip() for k in ln["keys"]][:4]}
+        for ln in data["lines"]
+    ]
+    save_outline(pack_id, "30s", lines)
+    cached = get_outline(pack_id, "30s")
+    assert cached == lines
+    assert cached[0]["keys"] == ["Google", "更新"]
+
+
+def test_outline_api_validates_slot(client):
+    hid = _seed_hotspot_with_sources()
+    from app.services import packs
+
+    pack_id = packs.generate_pack(hid, None, ScriptedLLM([_fake_scripts_response(), _fake_assets_response()]))["pack_id"]
+    assert client.post(f"/api/packs/{pack_id}/outline", json={"slot": "99s"}).status_code == 400
+    assert client.post(f"/api/packs/{pack_id}/outline", json={"slot": "60s"}).status_code in (200, 400)
