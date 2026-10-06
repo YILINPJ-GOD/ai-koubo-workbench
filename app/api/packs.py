@@ -96,7 +96,10 @@ def select_images(pack_id: int, body: dict):
     import json as _json
 
     n = len(_json.loads(row["image_candidates"]))
-    selected = [int(i) for i in (body.get("selected") or []) if 0 <= int(i) < n]
+    try:
+        selected = [int(i) for i in (body.get("selected") or []) if 0 <= int(i) < n]
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="selected 需要是数字数组")
     packs.set_selected_images(pack_id, selected)
     return {"selected": selected}
 

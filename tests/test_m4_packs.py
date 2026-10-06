@@ -633,3 +633,21 @@ def test_download_selected_guards_bad_images(fresh_db, client, monkeypatch):
     with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
         names = zf.namelist()
     assert names == ["image_1.png"]  # 只有合格那张进了包
+
+
+def test_select_images_rejects_non_int(fresh_db, client):
+    """selected 传非数字回 400，不能 500。"""
+    import json as _json
+
+    from app.db import execute
+
+    hid = _seed_hotspot_with_sources()
+    pid = execute(
+        "INSERT INTO packs(hotspot_id, scripts, captions, image_candidates, image_selected, publish, risks, checklist, created_at) "
+        f"VALUES (?, '{{}}', '{{}}', '[{{\"type\":\"card\",\"path\":\"x.png\"}}]', '[]', '{{}}', '[]', '[]', 'x')",
+        (hid,),
+    )
+    r = client.put(f"/api/packs/{pid}/images", json={"selected": ["abc"]})
+    assert r.status_code == 400
+    r2 = client.put(f"/api/packs/{pid}/images", json={"selected": [0]})
+    assert r2.status_code == 200 and r2.json()["selected"] == [0]
