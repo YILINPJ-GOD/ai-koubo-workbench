@@ -14,4 +14,3 @@ yt-dlp>=2024.10.0
 faster-whisper>=1.0.0
 # av 19 删除了 metadata_errors 参数，faster-whisper 1.2.x 转写会直接报错，锁在 16.x
 av>=14,<17
-pytest>=8.0

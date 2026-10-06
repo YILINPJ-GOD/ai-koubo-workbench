@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: windows-latest  # 与开发环境一致（路径/编码行为）
+    env:
+      WORKBENCH_HOME: ${{ runner.temp }}/wb-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: 安装依赖
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: 跑全量测试
+        run: python -m pytest tests/ -q

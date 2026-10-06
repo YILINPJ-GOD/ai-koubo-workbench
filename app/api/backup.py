@@ -1,6 +1,7 @@
 """备份与恢复接口：导出 zip、导入恢复、清空数据（PD.md 第 7 节）。"""
 import os
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
@@ -25,7 +26,7 @@ def export_backup():
     backup.export_backup(tmp)
     return FileResponse(
         tmp,
-        filename=f"workbench-backup-{__import__('datetime').datetime.now().strftime('%Y%m%d-%H%M%S')}.zip",
+        filename=f"workbench-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip",
         background=BackgroundTask(_cleanup, tmp),
     )
 

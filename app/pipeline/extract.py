@@ -13,12 +13,10 @@ from .http import http
 
 # curl_cffi 为可选依赖：中文安装路径会导致其证书加载失败，故复制到无中文的临时路径
 _curl_ca: str | None = None
-_curl_tried = False
 
 
 def _get_curl_cffi():
-    global _curl_ca, _curl_tried
-    _curl_tried = True
+    global _curl_ca
     try:
         from curl_cffi import requests as creq
         import certifi
