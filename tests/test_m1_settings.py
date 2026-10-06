@@ -142,6 +142,21 @@ def test_settings_rejects_bad_model(client):
     assert client.get("/api/settings").json()["model"] == "glm-4-flash"
 
 
+def test_settings_accepts_new_glm_models(client):
+    """智谱新模型按 glm- 前缀放行，硬编码名单会挡住新模型。"""
+    client.put("/api/settings", json={"model": "glm-4.6"})
+    assert client.get("/api/settings").json()["model"] == "glm-4.6"
+    client.put("/api/settings", json={"model": "glm-4.5-air"})
+    assert client.get("/api/settings").json()["model"] == "glm-4.5-air"
+
+
+def test_settings_rejects_injection_model(client):
+    client.put("/api/settings", json={"model": "glm-4; drop table users"})
+    assert client.get("/api/settings").json()["model"] == "glm-4-flash"
+    client.put("/api/settings", json={"model": "GLM-4-PLUS"})
+    assert client.get("/api/settings").json()["model"] == "glm-4-flash"  # 大写不放行，避免大小写绕过
+
+
 def test_settings_masked_key_not_overwritten(client):
     client.put("/api/settings", json={"api_key": "real-key-abcdef123456"})
     # 前端把掩码串原样传回时，不应覆盖真实 key

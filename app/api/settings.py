@@ -1,10 +1,15 @@
 """设置：API key / 模型 / 抓取源开关 / 写稿偏好 / 测试连接。"""
+import re
+
 from fastapi import APIRouter
 
 from ..config import SOURCE_NAMES, load_config, update_config
 from ..llm import LLMError, get_llm
 
 router = APIRouter()
+
+# 智谱模型持续更新，按 glm- 前缀通配校验（硬编码名单会挡住新模型，审查反馈）
+_MODEL_RE = re.compile(r"glm-[a-z0-9._-]+")
 
 
 def _mask(key: str) -> str:
@@ -34,10 +39,11 @@ def get_settings():
 
 @router.put("/settings")
 def put_settings(patch: dict):
-    allowed_models = {"glm-4-flash", "glm-4-air", "glm-4-plus"}
     patch = dict(patch)
-    if "model" in patch and patch["model"] not in allowed_models:
-        patch["model"] = "glm-4-flash"
+    if "model" in patch:
+        model = str(patch["model"] or "").strip()
+        if not _MODEL_RE.fullmatch(model):
+            patch["model"] = "glm-4-flash"
     if "api_key" in patch:
         # 前端可能原样回传掩码串，此时不覆盖真实 key
         v = str(patch["api_key"] or "").strip()

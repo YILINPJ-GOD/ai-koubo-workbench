@@ -5,8 +5,11 @@ import { useToast } from '../toast'
 
 const MODELS = [
   { value: 'glm-4-flash', label: 'glm-4-flash（默认，快且便宜）' },
-  { value: 'glm-4-air', label: 'glm-4-air（更强，稍贵）' },
-  { value: 'glm-4-plus', label: 'glm-4-plus（最强，最贵）' },
+  { value: 'glm-4-air', label: 'glm-4-air（更强，稍贵，写稿推荐）' },
+  { value: 'glm-4-plus', label: 'glm-4-plus（强，最贵）' },
+  { value: 'glm-4.6', label: 'glm-4.6（新一代旗舰）' },
+  { value: 'glm-4.5', label: 'glm-4.5（上一代旗舰）' },
+  { value: 'glm-4.5-air', label: 'glm-4.5-air（新一代性价比）' },
 ]
 const TONES = ['轻松接地气', '快节奏资讯播报', '理性分析派']
 
