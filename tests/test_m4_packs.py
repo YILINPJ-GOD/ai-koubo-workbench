@@ -565,3 +565,71 @@ def test_outline_api_validates_slot(client):
     pack_id = packs.generate_pack(hid, None, ScriptedLLM([_fake_scripts_response(), _fake_assets_response()]))["pack_id"]
     assert client.post(f"/api/packs/{pack_id}/outline", json={"slot": "99s"}).status_code == 400
     assert client.post(f"/api/packs/{pack_id}/outline", json={"slot": "60s"}).status_code in (200, 400)
+
+
+def test_download_selected_guards_bad_images(fresh_db, client, monkeypatch):
+    """打包下载与单图接口同一防护：非图片/超20MB的跳过，不炸整个zip。"""
+    import io
+    import zipfile
+
+    from app.db import execute
+
+    hid = _seed_hotspot_with_sources()
+    candidates = [
+        {"type": "remote", "url": "https://img.example/ok.jpg", "label": "ok"},
+        {"type": "remote", "url": "https://img.example/html", "label": "网页"},
+        {"type": "remote", "url": "https://img.example/huge.jpg", "label": "超大"},
+    ]
+    pid = execute(
+        "INSERT INTO packs(hotspot_id, scripts, captions, image_candidates, image_selected, publish, risks, checklist, created_at) "
+        f"VALUES (?, '{{}}', '{{}}', ?, '[0,1,2]', '{{}}', '[]', '[]', 'x')",
+        (hid, json.dumps(candidates)),
+    )
+
+    class FakeResp:
+        def __init__(self, ctype, content):
+            self.headers = {"content-type": ctype}
+            self._c = content
+
+        def raise_for_status(self):
+            pass
+
+        def read(self):
+            return self._c
+
+    class FakeStream:
+        def __init__(self, resp):
+            self._r = resp
+
+        def __enter__(self):
+            return self._r
+
+        def __exit__(self, *args):
+            return False
+
+    oversize = b"x" * (20 * 1024 * 1024 + 1)
+    responses = {
+        "https://img.example/ok.jpg": FakeResp("image/jpeg", b"fakejpeg"),
+        "https://img.example/html": FakeResp("text/html", b"<html>not image</html>"),
+        "https://img.example/huge.jpg": FakeResp("image/jpeg", oversize),
+    }
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def stream(self, method, url):
+            return FakeStream(responses[url])
+
+    import app.api.packs as packs_api
+
+    monkeypatch.setattr(packs_api.httpx, "Client", lambda **kwargs: FakeClient())
+
+    r = client.get(f"/api/packs/{pid}/images/download")
+    assert r.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
+        names = zf.namelist()
+    assert names == ["image_1.png"]  # 只有合格那张进了包

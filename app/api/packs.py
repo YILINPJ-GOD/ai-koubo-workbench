@@ -169,10 +169,17 @@ def download_selected(pack_id: int):
                 cache = packs.remote_cache_path(c["url"])
                 if not cache.exists():
                     try:
+                        # 与 image_file 同一防护：content-type 校验 + 20MB 上限（审查反馈）
                         with httpx.Client(headers={"User-Agent": "Mozilla/5.0"}, timeout=15, follow_redirects=True) as client:
-                            r = client.get(c["url"])
-                            r.raise_for_status()
-                            cache.write_bytes(r.content)
+                            with client.stream("GET", c["url"]) as r:
+                                r.raise_for_status()
+                                ctype = r.headers.get("content-type", "")
+                                if ctype and not ctype.startswith("image/"):
+                                    continue  # 非图片：跳过这张，不炸整个包
+                                data = r.read()
+                                if len(data) > 20 * 1024 * 1024:
+                                    continue  # 超20MB：跳过
+                                cache.write_bytes(data)
                     except Exception:  # noqa: BLE001
                         continue
                 if cache.exists():
