@@ -60,6 +60,9 @@ class SPAStaticFiles(StaticFiles):
         except StarletteHTTPException as e:
             if e.status_code != 404:
                 raise
+            # Windows 下 StaticFiles 的 path 用反斜杠，统一归一后再判断（审查反馈）
+            if path.replace("\\", "/").startswith("api/"):
+                raise  # 未知的 API 路径回 JSON 404，不能回 HTML（前端 fetch 拿到网页会报错不友好）
             return await super().get_response("index.html", scope)
 
 

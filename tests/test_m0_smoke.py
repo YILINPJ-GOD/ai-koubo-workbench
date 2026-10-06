@@ -186,3 +186,16 @@ def test_job_result_survives_tab_sleep(monkeypatch):
     with jobs._lock:
         jobs._gc_locked()
     assert jobs.get_job(jid) is None
+
+
+def test_unknown_api_path_returns_json_404():
+    """/api/* 未匹配路径必须回 JSON 404，不能被 SPA 回退成 HTML。"""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app) as client:
+        r = client.get("/api/nonexistent-endpoint")
+    assert r.status_code == 404
+    assert "application/json" in r.headers.get("content-type", "")
+    assert "detail" in r.json()
