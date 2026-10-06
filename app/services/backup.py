@@ -54,7 +54,10 @@ def _rotate(keep: int = KEEP) -> list[Path]:
 
 
 def export_backup(zip_path: Path) -> Path:
-    """导出 db + config.json + images/ 为 zip（手动备份，PD.md 7.3）。"""
+    """导出 db + config.json（剔除 API key）+ images/ 为 zip（手动备份，PD.md 7.3）。
+
+    API key 不进备份包：导出的 zip 可能被分享，明文 key 会一并泄露（审查反馈）。
+    """
     ensure_dirs()
     zip_path = Path(zip_path)
     zip_path.parent.mkdir(parents=True, exist_ok=True)
@@ -62,7 +65,9 @@ def export_backup(zip_path: Path) -> Path:
         if db_path().exists():
             zf.write(db_path(), "workbench.db")
         if config_path().exists():
-            zf.write(config_path(), "config.json")
+            cfg = json.loads(config_path().read_text(encoding="utf-8"))
+            cfg.pop("api_key", None)
+            zf.writestr("config.json", json.dumps(cfg, ensure_ascii=False, indent=2))
         img_dir = images_dir()
         if img_dir.exists():
             for f in img_dir.rglob("*"):
