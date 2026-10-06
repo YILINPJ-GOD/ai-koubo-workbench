@@ -661,3 +661,22 @@ def test_summarize_region_rule_names_zhipu():
 
     assert "智谱" in summarize.SYSTEM
     assert "智硬" not in summarize.SYSTEM
+
+
+def test_is_stale_treats_naive_as_beijing():
+    """无时区的时间戳按东八区算，不算 UTC（15天窗口边缘不再偏 8 小时）。"""
+    from datetime import datetime, timedelta, timezone
+
+    from app.pipeline import run as run_mod
+
+    now = datetime.now(timezone.utc)
+
+    def naive(dt):
+        return dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+    # now-15天+2小时：UTC 口径=没过期，东八区口径=过期（修复后应为过期）
+    assert run_mod._is_stale(naive(now - timedelta(days=15, hours=-2))) is True
+    assert run_mod._is_stale(naive(now - timedelta(days=1))) is False
+    assert run_mod._is_stale(naive(now - timedelta(days=20))) is True
+    # 带时区的时间戳不受影响
+    assert run_mod._is_stale((now - timedelta(days=20)).isoformat()) is True

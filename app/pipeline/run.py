@@ -26,7 +26,8 @@ def _is_stale(published_at: str) -> bool:
 
         ts = datetime.fromisoformat(pub.replace("Z", "+00:00"))
         if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=_tz.utc)
+            # 中文源的 naive 时间基本是东八区；按 UTC 算会让 15 天窗口边缘条目偏差 8 小时
+            ts = ts.replace(tzinfo=_tz(timedelta(hours=8)))
         cutoff = datetime.now(_tz.utc) - timedelta(days=STALE_DAYS)
         return ts < cutoff
     except ValueError:
