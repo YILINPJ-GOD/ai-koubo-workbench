@@ -653,3 +653,11 @@ def test_refresh_survives_fetcher_crash(fresh_db, monkeypatch):
     from app.db import query_one
     row = query_one("SELECT status FROM fetch_runs ORDER BY id DESC LIMIT 1")
     assert row["status"] == "done"  # 修复前永久 running
+
+
+def test_summarize_region_rule_names_zhipu():
+    """地区判断规则里的公司名不能有错字（"智硬"会让智谱动态归类失灵）。"""
+    from app.pipeline import summarize
+
+    assert "智谱" in summarize.SYSTEM
+    assert "智硬" not in summarize.SYSTEM
