@@ -248,6 +248,51 @@ def test_extract_text_rejects_no_link(fresh_db):
         transcribe.extract_text_from_link("纯文字没有链接")
 
 
+def test_douyin_link_helpers():
+    """抖音链接识别与视频ID解析（无网络）。"""
+    from app.services.transcribe import _is_douyin, _resolve_douyin_id
+
+    assert _is_douyin("https://www.douyin.com/video/123")
+    assert _is_douyin("https://v.douyin.com/abcDEF/")
+    assert _is_douyin("https://www.iesdouyin.com/share/video/123/")
+    assert not _is_douyin("https://www.bilibili.com/video/BV1x")
+
+    assert _resolve_douyin_id("https://www.douyin.com/video/7693260370593716331/?x=1") == "7693260370593716331"
+    assert _resolve_douyin_id("https://www.douyin.com/note/7000000000000000001") == "7000000000000000001"
+    assert _resolve_douyin_id("https://www.bilibili.com/video/BV1x") == ""
+
+
+def test_download_error_strips_ansi(monkeypatch, tmp_path):
+    """yt-dlp 报错里的 ANSI 色码不能混进用户提示。"""
+    import sys
+    import types
+
+    import pytest
+
+    from app.services import transcribe
+
+    class FakeYDL:
+        def __init__(self, opts):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def extract_info(self, url, download=True):
+            raise RuntimeError("[0;31mERROR[0m [Douyin] 123: Fresh cookies are needed")
+
+    monkeypatch.setitem(sys.modules, "yt_dlp", types.SimpleNamespace(YoutubeDL=FakeYDL))
+
+    with pytest.raises(transcribe.TranscribeError) as ei:
+        transcribe.download_video("https://www.bilibili.com/video/BV1x", tmp_path)
+    msg = str(ei.value)
+    assert "" not in msg
+    assert "粘贴文案" in msg
+
+
 def test_extract_text_api_job(client, monkeypatch):
     import app.services.transcribe as tr_mod
 

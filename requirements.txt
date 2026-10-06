@@ -1,7 +1,7 @@
 # AI口播工作台 v1 后端依赖
 fastapi>=0.110
 uvicorn[standard]>=0.29
-httpx>=0.27
+httpx>=0.27,<0.28  # 0.28 删除了 app= 参数，与 starlette 0.32 TestClient 不兼容
 feedparser>=6.0
 beautifulsoup4>=4.12
 trafilatura>=1.8
@@ -12,4 +12,6 @@ pydantic>=2.6
 python-multipart>=0.0.9
 yt-dlp>=2024.10.0
 faster-whisper>=1.0.0
+# av 19 删除了 metadata_errors 参数，faster-whisper 1.2.x 转写会直接报错，锁在 16.x
+av>=14,<19
 pytest>=8.0
